@@ -1,9 +1,12 @@
 package main
 
 import (
-    "os"
+	"fmt"
 	"log"
-    "fmt"
+	"os"
+    "os/exec"
+	"time"
+
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -33,9 +36,52 @@ func main() {
     }
 
     for _, task := range config.Tasks {
-        fmt.Printf("Task Name: %s\n", task.Name)
-        fmt.Printf("File Path: %s\n", task.File)
-        fmt.Printf("Schedule: Every %d %s\n", task.Schedule.Every, task.Schedule.Unit)
+        duration, err := getDuration(task.Schedule.Every, task.Schedule.Unit)
+        if err != nil {
+            log.Fatalf("Invalid schedule unit for task %s: %v", task.Name, err)
+        }
+
+        go scheduleTask(task, duration)
+    }
+
+    select {}
+}
+
+func scheduleTask(task Task, interval time.Duration) {
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
+
+    for {
+        <-ticker.C
+        fmt.Printf("Running task: %s\n", task.Name)
+        runTask(task.File)
     }
 }
 
+func getDuration(every int, unit string) (time.Duration, error) {
+    switch unit {
+    case "seconds":
+        return time.Duration(every) * time.Second, nil
+    case "minutes":
+        return time.Duration(every) * time.Minute, nil
+    case "hours":
+        return time.Duration(every) * time.Hour, nil
+    default:
+        return 0, fmt.Errorf("Unsupported time unit: %s", unit)
+    }
+}
+
+func runTask(filePath string) {
+    cmd := exec.Command("python3", filePath)
+    if err := cmd.Start(); err != nil {
+        log.Printf("Error starting task %s: %v", filePath, err)
+        return
+    }
+
+    if err := cmd.Wait(); err != nil {
+        log.Printf("Task %s failed: %v", filePath, err)
+        return
+    }
+
+    fmt.Printf("Task %s completed successfully\n", filePath)
+}
