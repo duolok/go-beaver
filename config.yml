@@ -1,0 +1,19 @@
+tasks:
+  - file: "../../hello.py"
+    name: "Process users task"
+    schedule:
+      every: 5
+      unit: seconds
+
+  - file: "../../hello.py"
+    name: "Process users task"
+    schedule:
+      every: 5
+      unit: seconds
+
+  - file: "../../hello.py"
+    name: "Process users task"
+    schedule:
+      every: 5
+      unit: seconds
+
