@@ -1,6 +1,7 @@
 tasks:
   - file: "hello.py"
-    name: "Process users task"
+    type: "python"
+    name: "Saying hello from python"
     schedule:
       every: 5
       unit: seconds
