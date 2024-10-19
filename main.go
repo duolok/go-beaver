@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-    "os/exec"
+	"os/exec"
+	"strings"
 	"time"
 
 	yaml "gopkg.in/yaml.v3"
@@ -13,6 +14,7 @@ import (
 type Task struct {
     File    string `yaml:"file"`
     Name    string `yaml:"name"`
+    Type    string `yaml:"type"`
     Schedule struct {
         Every int   `yaml:"every"`
         Unit  string   `yaml:"unit"`
@@ -54,7 +56,7 @@ func scheduleTask(task Task, interval time.Duration) {
     for {
         <-ticker.C
         fmt.Printf("Running task: %s\n", task.Name)
-        runTask(task.File)
+        runTask(task.Type, task.File)
     }
 }
 
@@ -71,8 +73,14 @@ func getDuration(every int, unit string) (time.Duration, error) {
     }
 }
 
-func runTask(filePath string) {
-    cmd := exec.Command("python3", filePath)
+func runTask(fileType string, filePath string) {
+    taskFileType, err := handleScriptType(fileType) 
+    if err != nil {
+        log.Printf("Unknown error type")
+        return
+    }
+
+    cmd := exec.Command(taskFileType, filePath)
     if err := cmd.Start(); err != nil {
         log.Printf("Error starting task %s: %v", filePath, err)
         return
@@ -84,4 +92,19 @@ func runTask(filePath string) {
     }
 
     fmt.Printf("Task %s completed successfully\n", filePath)
+}
+
+func handleScriptType(fileType string) (string, error) {
+    fileType = strings.TrimSpace(strings.ToLower(fileType))
+
+    switch fileType {
+    case "sh":
+        return "bash", nil
+    case "python":
+        return "python3", nil
+    case "bin":
+        return "./", nil
+    default:
+        return "0", fmt.Errorf("unknown filetype")
+    }
 }
