@@ -19,10 +19,12 @@ type Task struct {
 	File     string `yaml:"file"`
 	Name     string `yaml:"name"`
 	Type     string `yaml:"type"`
-	Schedule struct {
-		Every int    `yaml:"every"`
-		Unit  string `yaml:"unit"`
-	} `yaml:"schedule"`
+	Schedule Schedule `yaml:"schedule"`
+}
+
+type Schedule struct {
+	Every int    `yaml:"every"`
+	Unit  string `yaml:"unit"`
 }
 
 type TaskConfig struct {
