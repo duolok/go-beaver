@@ -10,7 +10,7 @@ import (
 )
 
 
-func runTask(fileType string, filePath string, timeout time.Duration) {
+func RunTask(fileType string, filePath string, timeout time.Duration) {
 	taskFileType, err := handleScriptType(fileType)
 	if err != nil {
 		log.Printf("Unknown error type")
