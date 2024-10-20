@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	yaml "gopkg.in/yaml.v3"
@@ -36,6 +38,18 @@ func main() {
         log.Fatalf("An error has occured.")
     }
 
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+    
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    go func() {
+        sig := <- sigChan
+        fmt.Printf("Receifed signal: %s. Shutting down...\n", sig)
+        cancel()
+    }()
+
     var config TaskConfig
     err = yaml.Unmarshal(data, &config)
     if err != nil {
@@ -48,14 +62,14 @@ func main() {
             log.Fatalf("Invalid schedule unit for task %s: %v", task.Name, err)
         }
 
-        go scheduleTask(task, duration)
+        go scheduleTask(ctx, task, duration)
     }
 
-    select {}
+    <- ctx.Done()
 }
 
-func scheduleTask(task Task, interval time.Duration) {
-    ticker := time.NewTicker(interval)
+func scheduleTask(ctx context.Context, task Task, interval time.Duration) {
+    ticker := time.NewTicker(interval) 
     defer ticker.Stop()
 
     for {
