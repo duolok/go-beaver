@@ -46,7 +46,7 @@ func main() {
 
     go func() {
         sig := <- sigChan
-        fmt.Printf("Receifed signal: %s. Shutting down...\n", sig)
+        fmt.Printf("\nReceived signal: %s. Shutting down...\n", sig)
         cancel()
     }()
 
