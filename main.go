@@ -5,38 +5,23 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
+
 	"github.com/fsnotify/fsnotify"
+	"github.com/duolok/go-beaver/config"
+	"github.com/duolok/go-beaver/taskrunner"
 	yaml "gopkg.in/yaml.v3"
 )
-
-type Task struct {
-	File     string `yaml:"file"`
-	Name     string `yaml:"name"`
-	Type     string `yaml:"type"`
-	Schedule Schedule `yaml:"schedule"`
-}
-
-type Schedule struct {
-	Every int    `yaml:"every"`
-	Unit  string `yaml:"unit"`
-}
-
-type TaskConfig struct {
-	Tasks []Task `yaml:"tasks"`
-}
 
 var (
 	configFile = "config.yml"
 )
 
 func main() {
-	config, err := loadConfig(configFile)
+	config, err := config.LoadConfig(configFile)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
@@ -50,7 +35,7 @@ func main() {
 	<-ctx.Done()
 }
 
-func scheduleAllTasks(ctx context.Context, config TaskConfig) []context.CancelFunc {
+func scheduleAllTasks(ctx context.Context, config config.TaskConfig) []context.CancelFunc {
 	var taskCancelFuncs []context.CancelFunc
 	for _, task := range config.Tasks {
 		duration, err := getDuration(task.Schedule.Every, task.Schedule.Unit)
@@ -65,7 +50,7 @@ func scheduleAllTasks(ctx context.Context, config TaskConfig) []context.CancelFu
 	return taskCancelFuncs
 }
 
-func runScheduledTask(ctx context.Context, task Task, interval time.Duration) {
+func runScheduledTask(ctx context.Context, task config.Task, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -76,7 +61,7 @@ func runScheduledTask(ctx context.Context, task Task, interval time.Duration) {
             return
         case <- ticker.C:
             fmt.Printf("Running task: %s\n", task.Name)
-            runTask(task.Type, task.File, interval)
+            taskrunner.RunTask(task.Type, task.File, interval)
         }
 	}
 }
@@ -94,48 +79,7 @@ func getDuration(every int, unit string) (time.Duration, error) {
 	}
 }
 
-func runTask(fileType string, filePath string, timeout time.Duration) {
-	taskFileType, err := handleScriptType(fileType)
-	if err != nil {
-		log.Printf("Unknown error type")
-		return
-	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, taskFileType, filePath)
-
-	output, err := cmd.CombinedOutput()
-	if ctx.Err() == context.DeadlineExceeded {
-		log.Printf("Task %s timed out after %v\n", filePath, timeout)
-		return
-	}
-
-	if err != nil {
-		log.Printf("Error running task %s: %v", filePath, err)
-		log.Printf("Output: \n%s", string(output))
-		return
-	}
-
-	log.Printf("Task %s output: \n%s", filePath, string(output))
-	fmt.Printf("Task %s completed successfully\n", filePath)
-}
-
-func handleScriptType(fileType string) (string, error) {
-	fileType = strings.TrimSpace(strings.ToLower(fileType))
-
-	switch fileType {
-	case "sh":
-		return "bash", nil
-	case "python":
-		return "python3", nil
-	case "bin":
-		return "./", nil
-	default:
-		return "0", fmt.Errorf("unknown filetype")
-	}
-}
 
 func watchConfigChanges(ctx context.Context, oldTaskCancelFuncs []context.CancelFunc) {
 	watcher, err := fsnotify.NewWatcher()
@@ -170,7 +114,7 @@ func watchConfigChanges(ctx context.Context, oldTaskCancelFuncs []context.Cancel
 					continue
 				}
 
-				var newConfig TaskConfig
+				var newConfig config.TaskConfig
 				err = yaml.Unmarshal(data, &newConfig)
 				if err != nil {
 					log.Printf("Error parsing config file: %v", err)
@@ -201,18 +145,4 @@ func setupGracefulShutdown() (context.Context, context.CancelFunc) {
 	}()
 
 	return ctx, cancel
-}
-
-func loadConfig(path string) (TaskConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return TaskConfig{}, fmt.Errorf("Unable to parse: %w", err)
-	}
-
-	var config TaskConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return TaskConfig{}, fmt.Errorf("Unable to parse config: %w", err)
-	}
-
-	return config, nil
 }
