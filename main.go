@@ -42,14 +42,8 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := setupGracefulShutdown()
 	defer cancel()
-
-	go func() {
-		sig := <-sigChan
-		fmt.Printf("\nReceived signal: %s. Shutting down...\n", sig)
-		cancel()
-	}()
 
 	var config TaskConfig
 	err = yaml.Unmarshal(data, &config)
@@ -202,4 +196,18 @@ func watchConfigChanges(ctx context.Context, oldTaskCancelFuncs []context.Cancel
 
 		}
 	}
+}
+
+func setupGracefulShutdown() (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigChan
+		fmt.Printf("\nReceived signal: %s. Shutting down...\n", sig)
+		cancel()
+	}()
+
+	return ctx, cancel
 }
