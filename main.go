@@ -34,27 +34,16 @@ var (
 )
 
 func main() {
-	data, err := os.ReadFile(configFile)
+	config, err := loadConfig(configFile)
 	if err != nil {
-		log.Fatalf("An error has occured.")
+		log.Fatalf("Failed to load config: %v", err)
 	}
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	ctx, cancel := setupGracefulShutdown()
 	defer cancel()
 
-	var config TaskConfig
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		log.Fatalf("error: %v", err)
-	}
-    
     taskCancelFuncs := scheduleAllTasks(ctx, config)
-
     go watchConfigChanges(ctx, taskCancelFuncs)
-
 
 	<-ctx.Done()
 }
@@ -67,14 +56,14 @@ func scheduleAllTasks(ctx context.Context, config TaskConfig) []context.CancelFu
 			log.Fatalf("Invalid schedule unit for tasks %s: %v", task.Name, err)
 		}
 		taskCtx, cancel := context.WithCancel(ctx)
-		go scheduleTask(taskCtx, task, duration)
+		go runScheduledTask(taskCtx, task, duration)
 		taskCancelFuncs = append(taskCancelFuncs, cancel)
 	}
 
 	return taskCancelFuncs
 }
 
-func scheduleTask(ctx context.Context, task Task, interval time.Duration) {
+func runScheduledTask(ctx context.Context, task Task, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -210,4 +199,18 @@ func setupGracefulShutdown() (context.Context, context.CancelFunc) {
 	}()
 
 	return ctx, cancel
+}
+
+func loadConfig(path string) (TaskConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return TaskConfig{}, fmt.Errorf("Unable to parse: %w", err)
+	}
+
+	var config TaskConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return TaskConfig{}, fmt.Errorf("Unable to parse config: %w", err)
+	}
+
+	return config, nil
 }
