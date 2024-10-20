@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -25,8 +26,12 @@ type TaskConfig struct {
     Tasks []Task `yaml:"tasks"`
 }
 
+var (
+    configFile = "config.yml"
+)
+
 func main() {
-    data, err := os.ReadFile("config.yml")
+    data, err := os.ReadFile(configFile)
     if err != nil {
         log.Fatalf("An error has occured.")
     }
@@ -56,7 +61,7 @@ func scheduleTask(task Task, interval time.Duration) {
     for {
         <-ticker.C
         fmt.Printf("Running task: %s\n", task.Name)
-        runTask(task.Type, task.File)
+        runTask(task.Type, task.File, interval)
     }
 }
 
@@ -73,24 +78,31 @@ func getDuration(every int, unit string) (time.Duration, error) {
     }
 }
 
-func runTask(fileType string, filePath string) {
+func runTask(fileType string, filePath string, timeout time.Duration) {
     taskFileType, err := handleScriptType(fileType) 
     if err != nil {
         log.Printf("Unknown error type")
         return
     }
 
-    cmd := exec.Command(taskFileType, filePath)
-    if err := cmd.Start(); err != nil {
-        log.Printf("Error starting task %s: %v", filePath, err)
+    ctx, cancel := context.WithTimeout(context.Background(), timeout)
+    defer cancel()
+
+    cmd := exec.CommandContext(ctx, taskFileType, filePath)
+
+    output, err := cmd.CombinedOutput()
+    if ctx.Err() == context.DeadlineExceeded {
+        log.Printf("Task %s timed out after %v\n", filePath, timeout)
         return
     }
 
-    if err := cmd.Wait(); err != nil {
-        log.Printf("Task %s failed: %v", filePath, err)
+    if err != nil {
+        log.Printf("Error running task %s: %v", filePath, err)
+        log.Printf("Output: \n%s", string(output))
         return
     }
 
+    log.Printf("Task %s output: \n%s",filePath, string(output))
     fmt.Printf("Task %s completed successfully\n", filePath)
 }
 
