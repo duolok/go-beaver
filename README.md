@@ -1,6 +1,6 @@
 # Go-Beaver
 
-<img align="right" src="assets/go-beaver.png" width="313" alt="Tonic Logo">
+<img align="right" src="res/go-beaver.png" width="313" alt="Go-Beaver logo">
 
 Go Beaver is a highly flexible and modular task scheduler built with Go. It enables you to schedule, execute, and monitor tasks (e.g., shell scripts, Python scripts) based on time intervals specified in a configuration file.
 
