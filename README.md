@@ -55,7 +55,7 @@ tasks:
     type: "python"
     schedule:
       every: 2
-      unit: "hours"
+      unit: hours
 ```
 ## Task Configuration Options
  - name: A unique name for the task.
